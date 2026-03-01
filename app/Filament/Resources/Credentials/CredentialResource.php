@@ -22,6 +22,11 @@ class CredentialResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'titulo';
 
+    public static function canViewAny(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return CredentialForm::configure($schema);
