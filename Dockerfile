@@ -11,31 +11,32 @@ FROM php:8.2-fpm-alpine
 
 WORKDIR /var/www
 
-# Instalar dependências de sistema para Filament
+# 1. Instalar dependências de sistema
 RUN apk add --no-cache \
     bash curl libpng-dev libzip-dev zlib-dev \
     icu-dev oniguruma-dev nginx $PHPIZE_DEPS
 
-# Instalar extensões PHP essenciais
+# 2. Instalar extensões PHP
 RUN docker-php-ext-install gd zip intl bcmath pdo_mysql opcache
 
-# Instalar Composer
+# 3. Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copiar o código da aplicação
+# 4. Copiar código e assets do build anterior
 COPY . .
-
-# Copiar os assets compilados do estágio anterior
 COPY --from=assets /app/public/build ./public/build
 
-# Ajustar permissões para o Laravel
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+# 5. Copiar a config do Nginx (para o local correto no Alpine)
+COPY nginx.conf /etc/nginx/http.d/default.conf
 
-# Instalar dependências do Composer (Produção)
+# 6. Instalar dependências do Composer
 RUN composer install --no-dev --optimize-autoloader
 
-# Expor a porta que o Easypanel vai gerenciar
+# 7. AJUSTE DE PERMISSÕES (Único e final)
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && \
+    chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+
 EXPOSE 80
 
-# Script para rodar PHP-FPM e Nginx (O Easypanel cuida do Proxy)
+# Comando para iniciar ambos os serviços
 CMD php-fpm -D && nginx -g "daemon off;"
