@@ -1,41 +1,41 @@
-# Estágio 1: PHP e Dependências de Sistema
+# --- Estágio 1: Node.js (Build dos Assets) ---
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# --- Estágio 2: PHP e Dependências ---
 FROM php:8.2-fpm-alpine
 
-# Definir diretório de trabalho
 WORKDIR /var/www
 
-# Instalar dependências do sistema e extensões PHP necessárias para Laravel/Filament
+# Instalar dependências de sistema para Filament
 RUN apk add --no-cache \
-    bash \
-    curl \
-    libpng-dev \
-    libzip-dev \
-    zlib-dev \
-    icu-dev \
-    oniguruma-dev \
-    $PHPIZE_DEPS
+    bash curl libpng-dev libzip-dev zlib-dev \
+    icu-dev oniguruma-dev nginx $PHPIZE_DEPS
 
-RUN docker-php-ext-install \
-    gd \
-    zip \
-    intl \
-    bcmath \
-    pdo_mysql \
-    opcache
+# Instalar extensões PHP essenciais
+RUN docker-php-ext-install gd zip intl bcmath pdo_mysql opcache
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copiar arquivos do projeto
+# Copiar o código da aplicação
 COPY . .
 
-# Ajustar permissões para o Laravel (Storage e Cache)
+# Copiar os assets compilados do estágio anterior
+COPY --from=assets /app/public/build ./public/build
+
+# Ajustar permissões para o Laravel
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Instalar dependências do PHP (sem dev para produção)
+# Instalar dependências do Composer (Produção)
 RUN composer install --no-dev --optimize-autoloader
 
-# Expor a porta do PHP-FPM
-EXPOSE 9000
+# Expor a porta que o Easypanel vai gerenciar
+EXPOSE 80
 
-CMD ["php-fpm"]
+# Script para rodar PHP-FPM e Nginx (O Easypanel cuida do Proxy)
+CMD php-fpm -D && nginx -g "daemon off;"
